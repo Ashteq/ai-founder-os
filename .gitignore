@@ -4,3 +4,10 @@ venv/
 *.db
 *.log
 .env
+*.py[cod]
+*$py.class
+venv/
+ENV/
+env/
+.DS_Store
+.env
