@@ -309,25 +309,17 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
 
-    # ── Model Selector ──
+   
+   # ── Model Selector ──
     st.markdown("**[ ACTIVE LLM ]**")
     selected_model = st.selectbox(
         label="Ollama Model",
         options=[
-            "qwen3:latest",
-            "gemma3:latest",
-            "llama3.1:latest",
-            "mistral:latest",
-            "phi3:latest",
+            "gemma:2b",          # <--- Matches your list exactly!
+            "nomic-embed-text",
         ],
         index=0,
         label_visibility="collapsed",
-    )
-    st.markdown(
-        f'<div style="border:2px solid #2B2625; padding:6px 10px; background:#F0EDE6; '
-        f'font-family:\'Share Tech Mono\',monospace; font-size:0.78rem; '
-        f'color:#111; margin-bottom:8px;">⚙ MODEL: {selected_model}</div>',
-        unsafe_allow_html=True,
     )
 
     # ── DB Stats Telemetry ──
