@@ -92,7 +92,7 @@ h1, h2, h3 {
     font-family: var(--font) !important;
 }
 
-/* ── Containers / cards ── */
+/* ── Containers / cards / forms ── */
 [data-testid="stVerticalBlockBorderWrapper"],
 div[data-testid="stForm"],
 .stContainer {
@@ -104,7 +104,7 @@ div[data-testid="stForm"],
 }
 
 /* ── Buttons ── */
-.stButton > button {
+.stButton > button, div[data-testid="stForm"] > div > div > button {
     background-color: var(--accent1) !important;
     color: #fff !important;
     border: 2px solid var(--border) !important;
@@ -117,11 +117,11 @@ div[data-testid="stForm"],
     padding: 6px 16px !important;
     transition: none !important;
 }
-.stButton > button:hover {
+.stButton > button:hover, div[data-testid="stForm"] > div > div > button:hover {
     background-color: var(--accent2) !important;
     color: var(--text) !important;
 }
-.stButton > button:active {
+.stButton > button:active, div[data-testid="stForm"] > div > div > button:active {
     box-shadow: inset 2px 2px 0 #888880, inset -2px -2px 0 #ffffff !important;
     transform: translateY(1px) !important;
 }
@@ -209,7 +209,7 @@ select, option {
 st.markdown(RETRO_CSS, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════
-# WATERMARK FOOTER (fixed bottom bar)
+# WATERMARK FOOTER
 # ═══════════════════════════════════════════════════════════════════════════
 WATERMARK_HTML = """
 <style>
@@ -395,27 +395,25 @@ tab1, tab2, tab3, tab4 = st.tabs(TAB_LABELS)
 # TAB 1 — MEETING INTEL
 # ─────────────────────────────────────────────────────────────────────────
 with tab1:
-    with st.container(border=True):
-        st.markdown(
-            '<div style="font-family:\'Share Tech Mono\',monospace; font-size:1.05rem; '
-            'text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid #2B2625; '
-            'padding-bottom:6px; margin-bottom:14px;">MODULE 1 — Meeting Intelligence Engine</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<span style="font-family:\'Share Tech Mono\',monospace; font-size:0.78rem; '
-            'color:#5a5450;">Paste raw meeting notes or transcript. System will chunk, vectorize, '
-            'store to knowledge base, and generate analysis.</span>',
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        '<div style="font-family:\'Share Tech Mono\',monospace; font-size:1.05rem; '
+        'text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid #2B2625; '
+        'padding-bottom:6px; margin-bottom:14px;">MODULE 1 — Meeting Intelligence Engine</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<span style="font-family:\'Share Tech Mono\',monospace; font-size:0.78rem; '
+        'color:#5a5450;">Paste raw meeting notes or transcript. System will chunk, vectorize, '
+        'store to knowledge base, and generate analysis.</span><br><br>',
+        unsafe_allow_html=True,
+    )
 
-        st.markdown("")
+    with st.form("form_meeting"):
         col1, col2 = st.columns([1, 2])
         with col1:
             meeting_title = st.text_input(
                 "Meeting / Document Title",
                 placeholder="e.g. Investor Sync — 2025-07-14",
-                key="meeting_title",
             )
         with col2:
             st.markdown("")  # spacer
@@ -423,11 +421,10 @@ with tab1:
         meeting_notes = st.text_area(
             "Raw Meeting Notes / Transcript",
             height=260,
-            placeholder="Paste the full meeting transcript, notes, or discussion summary here...\n\nExample:\nJohn: We need to ship the auth module by end of Q3.\nSarah: The backend dependency isn't resolved yet — blocked on AWS IAM config.\n...",
-            key="meeting_notes",
+            placeholder="Paste the full meeting transcript, notes, or discussion summary here...",
         )
 
-        run_meeting = st.button("▶ PROCESS MEETING INTEL", key="run_meeting")
+        run_meeting = st.form_submit_button("▶ PROCESS MEETING INTEL", type="primary")
 
     if run_meeting:
         if not meeting_title.strip():
@@ -456,7 +453,6 @@ with tab1:
                         )
                         st.markdown("---")
                         st.markdown(analysis)
-
                 except Exception as exc:
                     st.error(f"Processing error: {exc}")
 
@@ -464,29 +460,27 @@ with tab1:
 # TAB 2 — TASK MANAGER
 # ─────────────────────────────────────────────────────────────────────────
 with tab2:
-    with st.container(border=True):
-        st.markdown(
-            '<div style="font-family:\'Share Tech Mono\',monospace; font-size:1.05rem; '
-            'text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid #2B2625; '
-            'padding-bottom:6px; margin-bottom:14px;">MODULE 2 — RAG-Augmented Task Prioritizer</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<span style="font-family:\'Share Tech Mono\',monospace; font-size:0.78rem; '
-            'color:#5a5450;">Enter tasks one per line. System retrieves relevant context from '
-            'knowledge base and generates a prioritized execution roadmap.</span>',
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        '<div style="font-family:\'Share Tech Mono\',monospace; font-size:1.05rem; '
+        'text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid #2B2625; '
+        'padding-bottom:6px; margin-bottom:14px;">MODULE 2 — RAG-Augmented Task Prioritizer</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<span style="font-family:\'Share Tech Mono\',monospace; font-size:0.78rem; '
+        'color:#5a5450;">Enter tasks one per line. System retrieves relevant context from '
+        'knowledge base and generates a prioritized execution roadmap.</span><br><br>',
+        unsafe_allow_html=True,
+    )
 
-        st.markdown("")
+    with st.form("form_tasks"):
         raw_tasks = st.text_area(
             "Today's Raw Tasks (one per line)",
             height=220,
-            placeholder="Review investor deck slides\nFinalize API contract with partner\nUnblock backend team on auth issue\nPost week summary to team Slack\nSchedule design review for mobile app\nReview Q3 hiring pipeline",
-            key="raw_tasks",
+            placeholder="Review investor deck slides\nFinalize API contract with partner\nUnblock backend team on auth issue",
         )
 
-        run_tasks = st.button("▶ GENERATE EXECUTION ROADMAP", key="run_tasks")
+        run_tasks = st.form_submit_button("▶ GENERATE EXECUTION ROADMAP", type="primary")
 
     if run_tasks:
         if not raw_tasks.strip():
@@ -503,7 +497,6 @@ with tab2:
                     roadmap = result["roadmap"]
 
                     with st.container(border=True):
-                        # Show parsed tasks
                         st.markdown(
                             f'<div style="font-family:\'Share Tech Mono\',monospace; '
                             f'font-size:0.8rem; color:#5a5450; margin-bottom:6px;">'
@@ -512,7 +505,6 @@ with tab2:
                             unsafe_allow_html=True,
                         )
 
-                        # Show context chunks in expander
                         if context_chunks:
                             with st.expander("► Retrieved Knowledge Base Context", expanded=False):
                                 for i, chunk in enumerate(context_chunks, 1):
@@ -525,14 +517,13 @@ with tab2:
                                         f'margin:6px 0; font-family:\'Share Tech Mono\',monospace; '
                                         f'font-size:0.75rem; background:#F0EDE6;">'
                                         f'<b>[{i}] {src} — {title}</b> (sim: {1-dist:.2f})<br>'
-                                        f'<span style="color:#5a5450">{text}{"..." if len(chunk.get("text_chunk","")) > 300 else ""}</span>'
+                                        f'<span style="color:#5a5450">{text}...</span>'
                                         f'</div>',
                                         unsafe_allow_html=True,
                                     )
 
                         st.markdown("---")
                         st.markdown(roadmap)
-
                 except Exception as exc:
                     st.error(f"Processing error: {exc}")
 
@@ -540,34 +531,31 @@ with tab2:
 # TAB 3 — HIRING ASSIST
 # ─────────────────────────────────────────────────────────────────────────
 with tab3:
-    with st.container(border=True):
-        st.markdown(
-            '<div style="font-family:\'Share Tech Mono\',monospace; font-size:1.05rem; '
-            'text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid #2B2625; '
-            'padding-bottom:6px; margin-bottom:14px;">MODULE 3 — Hiring Intelligence System</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<span style="font-family:\'Share Tech Mono\',monospace; font-size:0.78rem; '
-            'color:#5a5450;">Provide role details. System cross-references cultural context '
-            'from knowledge base and generates a complete scorecard + interview rubric.</span>',
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        '<div style="font-family:\'Share Tech Mono\',monospace; font-size:1.05rem; '
+        'text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid #2B2625; '
+        'padding-bottom:6px; margin-bottom:14px;">MODULE 3 — Hiring Intelligence System</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<span style="font-family:\'Share Tech Mono\',monospace; font-size:0.78rem; '
+        'color:#5a5450;">Provide role details. System cross-references cultural context '
+        'from knowledge base and generates a complete scorecard + interview rubric.</span><br><br>',
+        unsafe_allow_html=True,
+    )
 
-        st.markdown("")
+    with st.form("form_hiring"):
         role_title = st.text_input(
             "Role Title",
             placeholder="e.g. Senior Full-Stack Engineer",
-            key="role_title",
         )
         job_desc = st.text_area(
             "Job Goals & Description",
             height=200,
-            placeholder="Describe what you need:\n- Own the backend infrastructure\n- Ship the v2 API within 60 days\n- Work closely with a 3-person product team\n- Must be experienced with AWS, FastAPI, and PostgreSQL\n- Values: high autonomy, async-first, strong written communication",
-            key="job_desc",
+            placeholder="Describe what you need:\n- Own the backend infrastructure\n- Ship the v2 API within 60 days...",
         )
 
-        run_hiring = st.button("▶ GENERATE HIRING PACKAGE", key="run_hiring")
+        run_hiring = st.form_submit_button("▶ GENERATE HIRING PACKAGE", type="primary")
 
     if run_hiring:
         if not role_title.strip():
@@ -606,14 +594,13 @@ with tab3:
                                         f'margin:6px 0; font-family:\'Share Tech Mono\',monospace; '
                                         f'font-size:0.75rem; background:#F0EDE6;">'
                                         f'<b>[{i}] {src} — {title}</b> (sim: {1-dist:.2f})<br>'
-                                        f'<span style="color:#5a5450">{text}{"..." if len(chunk.get("text_chunk","")) > 300 else ""}</span>'
+                                        f'<span style="color:#5a5450">{text}...</span>'
                                         f'</div>',
                                         unsafe_allow_html=True,
                                     )
 
                         st.markdown("---")
                         st.markdown(hiring_package)
-
                 except Exception as exc:
                     st.error(f"Processing error: {exc}")
 
@@ -621,29 +608,27 @@ with tab3:
 # TAB 4 — STRATEGIC PLANNER
 # ─────────────────────────────────────────────────────────────────────────
 with tab4:
-    with st.container(border=True):
-        st.markdown(
-            '<div style="font-family:\'Share Tech Mono\',monospace; font-size:1.05rem; '
-            'text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid #2B2625; '
-            'padding-bottom:6px; margin-bottom:14px;">MODULE 4 — Strategic Risk Planner</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<span style="font-family:\'Share Tech Mono\',monospace; font-size:0.78rem; '
-            'color:#5a5450;">Input weekly strategic goals. System evaluates them against '
-            'knowledge base context, surfaces conflicts, and outputs a risk-scored execution plan.</span>',
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        '<div style="font-family:\'Share Tech Mono\',monospace; font-size:1.05rem; '
+        'text-transform:uppercase; letter-spacing:0.08em; border-bottom:2px solid #2B2625; '
+        'padding-bottom:6px; margin-bottom:14px;">MODULE 4 — Strategic Risk Planner</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<span style="font-family:\'Share Tech Mono\',monospace; font-size:0.78rem; '
+        'color:#5a5450;">Input weekly strategic goals. System evaluates them against '
+        'knowledge base context, surfaces conflicts, and outputs a risk-scored execution plan.</span><br><br>',
+        unsafe_allow_html=True,
+    )
 
-        st.markdown("")
+    with st.form("form_planner"):
         weekly_goals = st.text_area(
             "Weekly Strategic Goals",
             height=220,
-            placeholder="Enter this week's key goals:\n\n1. Close Series A lead investor by Friday\n2. Ship mobile app v1.2 to TestFlight\n3. Complete Q3 OKR mid-point review with team\n4. Resolve critical auth blocker in backend API\n5. Conduct 3 candidate interviews for CTO role\n6. Finalize partnership terms with Stripe integration partner",
-            key="weekly_goals",
+            placeholder="Enter this week's key goals:\n1. Close Series A lead investor by Friday\n2. Ship mobile app v1.2 to TestFlight...",
         )
 
-        run_planner_btn = st.button("▶ RUN STRATEGIC RISK AUDIT", key="run_planner")
+        run_planner_btn = st.form_submit_button("▶ RUN STRATEGIC RISK AUDIT", type="primary")
 
     if run_planner_btn:
         if not weekly_goals.strip():
@@ -706,7 +691,6 @@ with tab4:
 
                         st.markdown("---")
                         st.markdown(strategic_plan)
-
                 except Exception as exc:
                     st.error(f"Processing error: {exc}")
 
