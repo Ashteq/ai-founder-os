@@ -50,19 +50,7 @@ def generate_hiring_package(
     model: str = "qwen3:latest",
 ) -> str:
     """
-    Generate a complete hiring package using Ollama:
-    - Candidate scorecard matrix (weighted criteria)
-    - Technical interview rubric
-    - Culture-fit signal questions derived from knowledge base
-
-    Args:
-        role_title:      Short role name (e.g. "Senior Backend Engineer")
-        job_description: Full high-level job goals and requirements
-        context_chunks:  Retrieved cultural and historical context from vector DB
-        model:           Ollama model for generation
-
-    Returns:
-        Markdown string containing the full hiring package
+    Generate a complete hiring package using Ollama.
     """
     # Format retrieved context
     context_text = ""
@@ -119,8 +107,19 @@ For each: Question | Why We Ask This)
         model=model,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.message.content.strip()
-
+    
+    # ---------------------------------------------------------
+    # FIX: Safely parse the response regardless of Ollama version
+    # ---------------------------------------------------------
+    try:
+        # Try dictionary access first (Older versions & safe dict fallbacks)
+        if isinstance(response, dict):
+            return response.get('message', {}).get('content', '').strip()
+        # Try object attribute access (Newer Pydantic models)
+        else:
+            return response.message.content.strip()
+    except Exception as e:
+        raise RuntimeError(f"[generate_hiring_package] Failed to parse LLM response: {str(e)}")
 
 # ---------------------------------------------------------------------------
 # Combined entry point (used by app.py)

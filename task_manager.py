@@ -19,13 +19,6 @@ def retrieve_task_context(tasks: List[str], top_k: int = 3) -> List[Dict]:
     """
     For the full list of tasks (joined as one query), fetch the top-k most
     semantically relevant chunks from the vector store.
-
-    Args:
-        tasks: List of raw task strings from the user
-        top_k: Number of context chunks to retrieve
-
-    Returns:
-        List of dicts from database.query_vector_similarity
     """
     if not tasks:
         return []
@@ -41,7 +34,7 @@ def retrieve_task_context(tasks: List[str], top_k: int = 3) -> List[Dict]:
 
 
 # ---------------------------------------------------------------------------
-# Roadmap generation
+# Roadmap generation (VERSION-PROOF)
 # ---------------------------------------------------------------------------
 
 def generate_task_roadmap(
@@ -52,14 +45,6 @@ def generate_task_roadmap(
     """
     Send tasks + retrieved context to Ollama and get back an intelligent,
     re-prioritized daily execution roadmap with estimated time blocks.
-
-    Args:
-        tasks:          Raw list of task strings from the founder
-        context_chunks: Top-k context dicts from vector store
-        model:          Ollama model for generation
-
-    Returns:
-        Markdown string — the prioritized roadmap
     """
     # Format the retrieved context blocks for the prompt
     context_text = ""
@@ -115,7 +100,17 @@ Respond ONLY in clean Markdown with this structure, no preamble:
         model=model,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.message.content.strip()
+    
+    # ---------------------------------------------------------
+    # Safely parse the response regardless of Ollama version
+    # ---------------------------------------------------------
+    try:
+        if isinstance(response, dict):
+            return response.get('message', {}).get('content', '').strip()
+        else:
+            return response.message.content.strip()
+    except Exception as e:
+        raise RuntimeError(f"[generate_task_roadmap] Failed to parse LLM response: {str(e)}")
 
 
 # ---------------------------------------------------------------------------
@@ -128,16 +123,6 @@ def run_task_manager(
 ) -> Dict:
     """
     Single call from app.py.
-
-    Args:
-        raw_tasks_text: Newline-separated string of raw tasks
-        model:          Ollama model
-
-    Returns:
-        dict with keys:
-            tasks:          list[str] — parsed task list
-            context_chunks: list[dict] — retrieved context
-            roadmap:        str — markdown roadmap
     """
     # Parse line-separated tasks, strip blanks
     tasks = [line.strip() for line in raw_tasks_text.splitlines() if line.strip()]

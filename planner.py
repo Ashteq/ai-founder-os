@@ -23,13 +23,6 @@ def retrieve_strategic_context(
     Pull two sets of context from the vector store:
       1. Semantically relevant chunks to the goals (across all modules)
       2. Recent blocker/risk mentions specifically from meeting_intel
-
-    Args:
-        weekly_goals: Raw weekly goals text
-        top_k:        Number of chunks to retrieve per query
-
-    Returns:
-        Tuple of (goal_context: list[dict], blocker_context: list[dict])
     """
     goals_embedding = meeting_intel.embed_text(weekly_goals)
 
@@ -52,7 +45,7 @@ def retrieve_strategic_context(
 
 
 # ---------------------------------------------------------------------------
-# Strategic risk audit
+# Strategic risk audit (VERSION-PROOF)
 # ---------------------------------------------------------------------------
 
 def generate_strategic_plan(
@@ -63,15 +56,6 @@ def generate_strategic_plan(
 ) -> str:
     """
     Generate a strategic risk audit and execution plan using Ollama.
-
-    Args:
-        weekly_goals:    Raw text of the founder's weekly strategic goals
-        goal_context:    Semantically relevant knowledge-base chunks
-        blocker_context: Meeting-intel focused blocker chunks
-        model:           Ollama model
-
-    Returns:
-        Markdown string: risk audit report
     """
     def _format_chunks(chunks: List[Dict], label: str) -> str:
         if not chunks:
@@ -136,7 +120,17 @@ and de-risk the identified conflicts.)
         model=model,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.message.content.strip()
+    
+    # ---------------------------------------------------------
+    # Safely parse the response regardless of Ollama version
+    # ---------------------------------------------------------
+    try:
+        if isinstance(response, dict):
+            return response.get('message', {}).get('content', '').strip()
+        else:
+            return response.message.content.strip()
+    except Exception as e:
+        raise RuntimeError(f"[generate_strategic_plan] Failed to parse LLM response: {str(e)}")
 
 
 # ---------------------------------------------------------------------------
@@ -149,16 +143,6 @@ def run_planner(
 ) -> Dict:
     """
     Single call from app.py.
-
-    Args:
-        weekly_goals_text: Raw newline-or-paragraph weekly goals
-        model:             Ollama model
-
-    Returns:
-        dict with keys:
-            goal_context:    list[dict] — general context chunks
-            blocker_context: list[dict] — blocker-focused chunks
-            strategic_plan:  str — full markdown strategic audit
     """
     if not weekly_goals_text.strip():
         raise ValueError("[planner.run] Weekly goals text is required.")

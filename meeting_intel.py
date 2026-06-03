@@ -21,15 +21,6 @@ def chunk_text(
 ) -> List[str]:
     """
     Split `text` into overlapping character-window chunks.
-
-    Args:
-        text:       Raw input string (transcript / notes)
-        chunk_size: Maximum characters per chunk
-        overlap:    Character overlap between consecutive chunks to preserve
-                    sentence continuity
-
-    Returns:
-        List of non-empty string chunks.
     """
     if not text or not text.strip():
         return []
@@ -62,24 +53,37 @@ def chunk_text(
 
 
 # ---------------------------------------------------------------------------
-# Embedding helper
+# Embedding helper (VERSION-PROOF)
 # ---------------------------------------------------------------------------
 
 def embed_text(text: str) -> List[float]:
     """
     Call local Ollama nomic-embed-text model to get a 768-dim embedding.
-
-    Args:
-        text: String to embed (will be truncated to ~8192 tokens by model)
-
-    Returns:
-        List[float] of length 768
+    Safely handles both v0.1.x (embeddings) and v0.2.x+ (embed) API changes.
     """
-    response = ollama.embed(model="nomic-embed-text", input=text)
-    # ollama.embed returns an EmbedResponse with an `embeddings` attribute
-    # which is a list of embedding vectors (one per input string).
-    embedding = response.embeddings[0]
-    return embedding
+    try:
+        # 1. Try modern version API
+        if hasattr(ollama, 'embed'):
+            response = ollama.embed(model="nomic-embed-text", input=text)
+            
+            # Extract safely if it's a dict or object
+            if isinstance(response, dict):
+                embs = response.get("embeddings", [])
+                return embs[0] if (embs and isinstance(embs[0], list)) else embs
+            else:
+                return response.embeddings[0]
+                
+        # 2. Try legacy version API fallback
+        else:
+            response = ollama.embeddings(model="nomic-embed-text", prompt=text)
+            
+            if isinstance(response, dict):
+                return response.get("embedding", [])
+            else:
+                return response.embedding
+                
+    except Exception as e:
+        raise RuntimeError(f"[meeting_intel.embed_text] Vector generation failed: {str(e)}")
 
 
 # ---------------------------------------------------------------------------
@@ -88,18 +92,7 @@ def embed_text(text: str) -> List[float]:
 
 def ingest_meeting_notes(title: str, raw_text: str) -> Dict:
     """
-    Full pipeline:
-      1. Chunk raw_text
-      2. Embed each chunk via nomic-embed-text
-      3. Persist chunks + embeddings to founder_knowledge (module='meeting_intel')
-      4. Return dict with chunk count and list of saved chunk IDs
-
-    Args:
-        title:    Document label (meeting name / date)
-        raw_text: Full raw transcript or notes text
-
-    Returns:
-        dict with keys: chunks_saved (int), saved_ids (list[int])
+    Full pipeline to chunk, embed, and save to DB.
     """
     chunks = chunk_text(raw_text)
     if not chunks:
@@ -120,22 +113,12 @@ def ingest_meeting_notes(title: str, raw_text: str) -> Dict:
 
 
 # ---------------------------------------------------------------------------
-# Analysis pipeline
+# Analysis pipeline (VERSION-PROOF)
 # ---------------------------------------------------------------------------
 
 def analyze_meeting(title: str, raw_text: str, model: str = "qwen3:latest") -> str:
     """
     Use Ollama to generate a structured markdown analysis of the meeting.
-
-    Returns a markdown string containing:
-      ## Summary
-      ## Action Items
-      ## Risks & Blockers
-
-    Args:
-        title:    Meeting label (used in the prompt for context)
-        raw_text: Full raw text of the meeting notes / transcript
-        model:    Ollama model to use for generation
     """
     # Truncate raw text to ~6000 chars to stay within context safely
     truncated = raw_text[:6000] if len(raw_text) > 6000 else raw_text
@@ -165,7 +148,17 @@ Respond ONLY in clean Markdown with exactly three sections, no preamble:
         model=model,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.message.content.strip()
+    
+    # ---------------------------------------------------------
+    # Safely parse the response regardless of Ollama version
+    # ---------------------------------------------------------
+    try:
+        if isinstance(response, dict):
+            return response.get('message', {}).get('content', '').strip()
+        else:
+            return response.message.content.strip()
+    except Exception as e:
+        raise RuntimeError(f"[analyze_meeting] Failed to parse LLM response: {str(e)}")
 
 
 # ---------------------------------------------------------------------------
@@ -174,14 +167,7 @@ Respond ONLY in clean Markdown with exactly three sections, no preamble:
 
 def run_meeting_intel(title: str, raw_text: str, model: str = "qwen3:latest") -> Dict:
     """
-    Single call from app.py that:
-      1. Ingests and vectorizes the notes into the DB
-      2. Generates and returns the markdown analysis
-
-    Returns:
-        dict with keys:
-            ingest_result: dict (chunks_saved, saved_ids)
-            analysis:      str (markdown)
+    Single call from app.py
     """
     ingest_result = ingest_meeting_notes(title=title, raw_text=raw_text)
     analysis = analyze_meeting(title=title, raw_text=raw_text, model=model)
