@@ -32,8 +32,8 @@ def _get_dsn() -> str:
     if env_url:
         return env_url
 
-    # Local WSL2 / native Postgres fallback
-    return "postgresql://postgres:postgres@localhost:5432/founder_os"
+    # Adjusted fallback for custom local Docker container on port 5433
+    return "postgresql://akanksha:secure_password_here@localhost:5433/founder_os"
 
 
 def get_connection() -> psycopg2.extensions.connection:
@@ -72,12 +72,12 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Master knowledge table
 CREATE TABLE IF NOT EXISTS founder_knowledge (
-    id             SERIAL PRIMARY KEY,
-    module_source  TEXT        NOT NULL,
-    document_title TEXT        NOT NULL,
-    text_chunk     TEXT        NOT NULL,
-    embedding      VECTOR(768),
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id              SERIAL PRIMARY KEY,
+    module_source   TEXT        NOT NULL,
+    document_title  TEXT        NOT NULL,
+    text_chunk      TEXT        NOT NULL,
+    embedding       VECTOR(768),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Cosine-distance index for fast ANN search (IVFFlat)
