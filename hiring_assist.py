@@ -47,7 +47,7 @@ def generate_hiring_package(
     role_title: str,
     job_description: str,
     context_chunks: List[Dict],
-    model: str = "qwen3:latest",
+    model: str = "gemma:2b",
 ) -> str:
     """
     Generate a complete hiring package using Ollama.
@@ -79,7 +79,7 @@ JOB GOALS & DESCRIPTION:
 COMPANY CONTEXT FROM KNOWLEDGE BASE (cultural notes, tools, values, team history):
 {context_text}
 
-Produce a complete, structured hiring package in clean Markdown. No preamble.
+Produce a complete, structured hiring package in clean Markdown. No preamble. Include double line breaks between sections.
 
 ---
 
@@ -110,14 +110,30 @@ For each: Question | Why We Ask This)
     
     # ---------------------------------------------------------
     # FIX: Safely parse the response regardless of Ollama version
+    # and sanitize the Markdown for Streamlit rendering.
     # ---------------------------------------------------------
     try:
-        # Try dictionary access first (Older versions & safe dict fallbacks)
+        # 1. Extract Raw Text
         if isinstance(response, dict):
-            return response.get('message', {}).get('content', '').strip()
-        # Try object attribute access (Newer Pydantic models)
+            raw_text = response.get('message', {}).get('content', '').strip()
         else:
-            return response.message.content.strip()
+            raw_text = response.message.content.strip()
+            
+        # 2. Sanitize for Streamlit CommonMark layout collapse
+        lines = raw_text.splitlines()
+        processed_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith(("-", "*", "#", "|", "1.", "[", "─")):
+                processed_lines.append(line)
+            elif stripped == "":
+                processed_lines.append("")
+            else:
+                # Force double spacing for standard text lines
+                processed_lines.append(line + "  ")
+                
+        return "\n".join(processed_lines)
+
     except Exception as e:
         raise RuntimeError(f"[generate_hiring_package] Failed to parse LLM response: {str(e)}")
 
@@ -128,7 +144,7 @@ For each: Question | Why We Ask This)
 def run_hiring_assist(
     role_title: str,
     job_description: str,
-    model: str = "qwen3:latest",
+    model: str = "gemma:2b",
 ) -> Dict:
     """
     Single call from app.py.
@@ -145,7 +161,7 @@ def run_hiring_assist(
             hiring_package:   str — full markdown hiring package
     """
     if not role_title.strip() or not job_description.strip():
-        raise ValueError("[hiring_assist.run] Role title and job description are required.")
+        raise ValueError("[hiring_assist.run_hiring_assist] Role title and job description are required.")
 
     context_chunks = retrieve_hiring_context(job_description, top_k=5)
     hiring_package = generate_hiring_package(

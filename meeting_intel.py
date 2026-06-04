@@ -116,7 +116,7 @@ def ingest_meeting_notes(title: str, raw_text: str) -> Dict:
 # Analysis pipeline (VERSION-PROOF)
 # ---------------------------------------------------------------------------
 
-def analyze_meeting(title: str, raw_text: str, model: str = "qwen3:latest") -> str:
+def analyze_meeting(title: str, raw_text: str, model: str = "gemma:2b") -> str:
     """
     Use Ollama to generate a structured markdown analysis of the meeting.
     """
@@ -132,7 +132,7 @@ Meeting Title: {title}
 {truncated}
 --- MEETING NOTES END ---
 
-Respond ONLY in clean Markdown with exactly three sections, no preamble:
+Respond ONLY in clean Markdown with exactly three sections, no preamble. Ensure proper line breaks.
 
 ## 📋 Summary
 (2–4 sentence executive summary of what was discussed and decided)
@@ -151,12 +151,28 @@ Respond ONLY in clean Markdown with exactly three sections, no preamble:
     
     # ---------------------------------------------------------
     # Safely parse the response regardless of Ollama version
+    # and sanitize the Markdown for Streamlit rendering.
     # ---------------------------------------------------------
     try:
         if isinstance(response, dict):
-            return response.get('message', {}).get('content', '').strip()
+            raw_text = response.get('message', {}).get('content', '').strip()
         else:
-            return response.message.content.strip()
+            raw_text = response.message.content.strip()
+            
+        # Streamlit Markdown Sanitizer
+        lines = raw_text.splitlines()
+        processed_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith(("-", "*", "#", "|", "1.", "[", "─")):
+                processed_lines.append(line)
+            elif stripped == "":
+                processed_lines.append("")
+            else:
+                processed_lines.append(line + "  ")
+                
+        return "\n".join(processed_lines)
+            
     except Exception as e:
         raise RuntimeError(f"[analyze_meeting] Failed to parse LLM response: {str(e)}")
 
@@ -165,7 +181,7 @@ Respond ONLY in clean Markdown with exactly three sections, no preamble:
 # Combined entry point (used by app.py)
 # ---------------------------------------------------------------------------
 
-def run_meeting_intel(title: str, raw_text: str, model: str = "qwen3:latest") -> Dict:
+def run_meeting_intel(title: str, raw_text: str, model: str = "gemma:2b") -> Dict:
     """
     Single call from app.py
     """

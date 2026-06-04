@@ -52,7 +52,7 @@ def generate_strategic_plan(
     weekly_goals: str,
     goal_context: List[Dict],
     blocker_context: List[Dict],
-    model: str = "qwen3:latest",
+    model: str = "gemma:2b",
 ) -> str:
     """
     Generate a strategic risk audit and execution plan using Ollama.
@@ -86,7 +86,7 @@ RELEVANT KNOWLEDGE BASE CONTEXT (past decisions, updates, constraints):
 BLOCKER & RISK SIGNALS FROM MEETING NOTES:
 {blocker_ctx_text}
 
-Produce a full strategic planning report in clean Markdown. No preamble.
+Produce a full strategic planning report in clean Markdown. No preamble. Ensure proper line breaks.
 
 ---
 
@@ -123,12 +123,29 @@ and de-risk the identified conflicts.)
     
     # ---------------------------------------------------------
     # Safely parse the response regardless of Ollama version
+    # and sanitize the Markdown for Streamlit rendering.
     # ---------------------------------------------------------
     try:
         if isinstance(response, dict):
-            return response.get('message', {}).get('content', '').strip()
+            raw_text = response.get('message', {}).get('content', '').strip()
         else:
-            return response.message.content.strip()
+            raw_text = response.message.content.strip()
+
+        # Streamlit Markdown Sanitizer
+        lines = raw_text.splitlines()
+        processed_lines = []
+        for line in lines:
+            stripped = line.strip()
+            # Preserve tables (|), lists (- * 1.), headers (#), blockquotes (>)
+            if stripped.startswith(("-", "*", "#", "|", "1.", "[", "─", ">")):
+                processed_lines.append(line)
+            elif stripped == "":
+                processed_lines.append("")
+            else:
+                processed_lines.append(line + "  ")
+                
+        return "\n".join(processed_lines)
+
     except Exception as e:
         raise RuntimeError(f"[generate_strategic_plan] Failed to parse LLM response: {str(e)}")
 
@@ -139,13 +156,13 @@ and de-risk the identified conflicts.)
 
 def run_planner(
     weekly_goals_text: str,
-    model: str = "qwen3:latest",
+    model: str = "gemma:2b",
 ) -> Dict:
     """
     Single call from app.py.
     """
     if not weekly_goals_text.strip():
-        raise ValueError("[planner.run] Weekly goals text is required.")
+        raise ValueError("[planner.run_planner] Weekly goals text is required.")
 
     goal_context, blocker_context = retrieve_strategic_context(
         weekly_goals=weekly_goals_text,

@@ -24,7 +24,8 @@ def _get_dsn() -> str:
       3. Hard-coded local-dev fallback (localhost, db=founder_os, user=postgres)
     """
     try:
-        return st.secrets["DATABASE_URL"]
+        if "DATABASE_URL" in st.secrets:
+            return st.secrets["DATABASE_URL"]
     except (KeyError, AttributeError, FileNotFoundError):
         pass
 
@@ -32,8 +33,8 @@ def _get_dsn() -> str:
     if env_url:
         return env_url
 
-    # Adjusted fallback for custom local Docker container on port 5433
-    return "postgresql://akanksha:secure_password_here@localhost:5433/founder_os"
+    # Standard local fallback aligned with trusted local container on port 5433
+    return "postgresql://postgres:postgres@localhost:5433/founder_os"
 
 
 def get_connection() -> psycopg2.extensions.connection:
@@ -87,7 +88,7 @@ BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_indexes
         WHERE tablename = 'founder_knowledge'
-          AND indexname = 'founder_knowledge_embedding_idx'
+          and indexname = 'founder_knowledge_embedding_idx'
     ) THEN
         CREATE INDEX founder_knowledge_embedding_idx
             ON founder_knowledge
@@ -104,16 +105,35 @@ def init_db() -> None:
     Run schema bootstrap SQL.  Called once from app.py on startup.
     Idempotent — safe to call multiple times.
     """
-    conn = get_connection()
+    dsn = _get_dsn()
+    # Masking password for safe terminal log printing
+    masked_dsn = dsn
+    if "@" in dsn:
+        credentials, host_info = dsn.split("@", 1)
+        if ":" in credentials:
+            prefix, _ = credentials.rsplit(":", 1)
+            masked_dsn = f"{prefix}:****@{host_info}"
+            
+    print(f"\n[DIAGNOSTIC] Schema boot initiating...")
+    print(f"[DIAGNOSTIC] Targeted DSN Connection String: {masked_dsn}\n")
+    
     try:
+        conn = get_connection()
         with conn.cursor() as cur:
             cur.execute(INIT_SQL)
         conn.commit()
+        print("[DIAGNOSTIC] Schema bootstrap completed successfully without errors.\n")
     except Exception as exc:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         raise RuntimeError(f"[database.init_db] Schema bootstrap failed: {exc}") from exc
     finally:
-        conn.close()
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -126,16 +146,6 @@ def save_vector_chunk(
     chunk: str,
     embedding_vector: List[float],
 ) -> int:
-    """
-    Persist one text chunk and its embedding to founder_knowledge.
-    Returns the new row id.
-
-    Args:
-        module:           Source module tag e.g. 'meeting_intel', 'task_manager'
-        title:            Human-readable document title / label
-        chunk:            The raw text slice
-        embedding_vector: 768-dimensional float list from nomic-embed-text
-    """
     if len(embedding_vector) != 768:
         raise ValueError(
             f"[save_vector_chunk] Expected 768-dim vector, got {len(embedding_vector)}"
@@ -150,7 +160,6 @@ def save_vector_chunk(
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            # psycopg2 needs the vector as a Postgres literal string: '[0.1,0.2,...]'
             vec_literal = "[" + ",".join(str(v) for v in embedding_vector) + "]"
             cur.execute(sql, (module, title, chunk, vec_literal))
             row_id = cur.fetchone()[0]
@@ -172,19 +181,6 @@ def query_vector_similarity(
     limit: int = 3,
     module_filter: Optional[str] = None,
 ) -> List[dict]:
-    """
-    Return the top-`limit` most semantically similar chunks from founder_knowledge
-    using pgvector cosine distance ('<=>' operator).
-
-    Args:
-        query_vector:   768-dim query embedding
-        limit:          Number of top results to return
-        module_filter:  If set, restrict search to rows from this module_source
-
-    Returns:
-        List of dicts with keys: id, module_source, document_title, text_chunk,
-        created_at, distance
-    """
     if len(query_vector) != 768:
         raise ValueError(
             f"[query_vector_similarity] Expected 768-dim vector, got {len(query_vector)}"
@@ -241,10 +237,6 @@ def query_vector_similarity(
 # ---------------------------------------------------------------------------
 
 def get_db_stats() -> dict:
-    """
-    Return basic telemetry: total chunks per module and grand total.
-    Returns dict with keys 'total' and 'by_module' (list of dicts).
-    """
     sql_total = "SELECT COUNT(*) FROM founder_knowledge;"
     sql_by_module = """
         SELECT module_source, COUNT(*) AS cnt

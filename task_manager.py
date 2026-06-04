@@ -40,7 +40,7 @@ def retrieve_task_context(tasks: List[str], top_k: int = 3) -> List[Dict]:
 def generate_task_roadmap(
     tasks: List[str],
     context_chunks: List[Dict],
-    model: str = "qwen3:latest",
+    model: str = "gemma:2b",
 ) -> str:
     """
     Send tasks + retrieved context to Ollama and get back an intelligent,
@@ -76,7 +76,9 @@ RAW TASKS FROM FOUNDER TODAY:
 
 Using the context above to understand constraints, blockers, and background, produce a structured daily execution plan.
 
-Respond ONLY in clean Markdown with this structure, no preamble:
+Respond ONLY in clean Markdown with this structure, no preamble. Ensure proper line breaks.
+
+---
 
 ## 🗺️ Daily Execution Roadmap
 
@@ -103,12 +105,28 @@ Respond ONLY in clean Markdown with this structure, no preamble:
     
     # ---------------------------------------------------------
     # Safely parse the response regardless of Ollama version
+    # and sanitize the Markdown for Streamlit rendering.
     # ---------------------------------------------------------
     try:
         if isinstance(response, dict):
-            return response.get('message', {}).get('content', '').strip()
+            raw_text = response.get('message', {}).get('content', '').strip()
         else:
-            return response.message.content.strip()
+            raw_text = response.message.content.strip()
+
+        # Streamlit Markdown Sanitizer
+        lines = raw_text.splitlines()
+        processed_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith(("-", "*", "#", "|", "1.", "[", "─")):
+                processed_lines.append(line)
+            elif stripped == "":
+                processed_lines.append("")
+            else:
+                processed_lines.append(line + "  ")
+                
+        return "\n".join(processed_lines)
+
     except Exception as e:
         raise RuntimeError(f"[generate_task_roadmap] Failed to parse LLM response: {str(e)}")
 
@@ -119,7 +137,7 @@ Respond ONLY in clean Markdown with this structure, no preamble:
 
 def run_task_manager(
     raw_tasks_text: str,
-    model: str = "qwen3:latest",
+    model: str = "gemma:2b",
 ) -> Dict:
     """
     Single call from app.py.
@@ -127,7 +145,7 @@ def run_task_manager(
     # Parse line-separated tasks, strip blanks
     tasks = [line.strip() for line in raw_tasks_text.splitlines() if line.strip()]
     if not tasks:
-        raise ValueError("[task_manager.run] No tasks provided.")
+        raise ValueError("[task_manager.run_task_manager] No tasks provided.")
 
     context_chunks = retrieve_task_context(tasks, top_k=3)
     roadmap = generate_task_roadmap(
